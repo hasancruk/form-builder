@@ -25,12 +25,13 @@ export class AwsInfrastructureStack extends Stack {
     });
 
     const rwFormConfig = new lambda.Function(this, "RWFormConfig", {
-      runtime: lambda.Runtime.NODEJS_16_X,
+      runtime: lambda.Runtime.NODEJS_18_X,
       // TODO Replace this with typescript lambdas
       code: lambda.Code.fromAsset("lambda"),
       handler: "rwFormConfig.handler",
       environment: {
         "FORM_BUCKET": formConfigBucket.bucketName,
+        "CDN_URL": distribution.domainName,
       },
     });
 

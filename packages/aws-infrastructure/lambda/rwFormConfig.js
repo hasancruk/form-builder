@@ -1,15 +1,17 @@
-const aws = require("aws-sdk");
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 
 const putFormToS3 = async (bucket, key, data) => {
-  const s3 = new aws.S3();
+  const client = new S3Client();
   const params = {
     Bucket: bucket,
     Key: key,
     Body: data
   };
   
+  const command = new PutObjectCommand(params);
+
   try {
-    const resp = await s3.putObject(params).promise();
+    const resp = await client.send(command);
     console.log(resp);
     return { success: true };
   } catch (err) {
@@ -18,18 +20,16 @@ const putFormToS3 = async (bucket, key, data) => {
   }
 };
 
-const getForm = async (bucket, key) => {
-  const s3 = new aws.S3();
-  const params = {
-    Bucket: bucket,
-    Key: key
-  };
-
+const getForm = async (url, fileName) => {
   try {
-    const resp = await s3.getObject(params).promise();
+    const resp = await fetch(`https://${url}/${fileName}`);
+    if (!resp.ok) {
+      throw new Error("No such file");
+    }
+    const data = await resp.json();
     console.log(resp);
     return { 
-      data: JSON.parse(resp.Body),
+      data,
       success: true
     };
   } catch (err) {
@@ -43,6 +43,7 @@ exports.handler = async (event) => {
 
   const bucket = process.env.FORM_BUCKET;
   const key = "support-us.json";
+  const cdnUrl = process.env.CDN_URL;
 
   let response = {
     statusCode: 200,
@@ -66,7 +67,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === "GET") {
     if (event.path === "/forms") {
       const { formId } = event.queryStringParameters;
-      const { data, success } = await getForm(bucket, formId);
+      const { data, success } = await getForm(cdnUrl, formId);
       body = {
         content: success ? JSON.stringify(data) : "nothing found",
       };  
