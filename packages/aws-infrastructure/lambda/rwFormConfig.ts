@@ -1,6 +1,6 @@
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-const putFormToS3 = async (bucket, key, data) => {
+const putFormToS3 = async (bucket: string, key: string, data: unknown) => {
   const client = new S3Client();
   const params = {
     Bucket: bucket,
@@ -14,13 +14,13 @@ const putFormToS3 = async (bucket, key, data) => {
     const resp = await client.send(command);
     console.log(resp);
     return { success: true };
-  } catch (err) {
+  } catch (err: unknown) {
     console.error(err);
     return { success: false };
   }
 };
 
-const getForm = async (url, fileName) => {
+const getForm = async (url: string, fileName: string) => {
   try {
     const resp = await fetch(`https://${url}/${fileName}`);
     if (!resp.ok) {
@@ -32,13 +32,13 @@ const getForm = async (url, fileName) => {
       data,
       success: true
     };
-  } catch (err) {
+  } catch (err: unknown) {
     console.error(err);
     return { success: false };
   }
 };
 
-exports.handler = async (event) => {
+export const handler = async (event: any) => {
   console.log("request:", JSON.stringify(event, undefined, 2));
 
   const bucket = process.env.FORM_BUCKET;
@@ -69,7 +69,7 @@ exports.handler = async (event) => {
       const { formId } = event.queryStringParameters;
       const { data, success } = await getForm(cdnUrl, formId);
       body = {
-        content: success ? JSON.stringify(data) : "nothing found",
+        message: success ? JSON.stringify(data) : "nothing found",
       };  
     } else {
       body = {
