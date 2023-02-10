@@ -23,27 +23,7 @@ export class AwsInfrastructureStack extends Stack {
     const distribution = new cloudfront.Distribution(this, "FormConfigDistribution", {
       defaultBehavior: { origin: new origins.S3Origin(formConfigBucket) },
     });
-
-    const formConfigService = new lambda.Function(this, "FormConfigService", {
-      runtime: lambda.Runtime.NODEJS_18_X,
-      code: lambda.Code.fromAsset("bin/lambda"),
-      handler: "formConfigService.handler",
-      environment: {
-        "FORM_BUCKET": formConfigBucket.bucketName,
-        "CDN_URL": distribution.domainName,
-      },
-    });
-
-    formConfigBucket.grantReadWrite(formConfigService);
-
-    const formsEndpoint = new apigateway.LambdaRestApi(this, "FormsEndpoint", {
-      handler: formConfigService,
-      deploy: true,
-      deployOptions: {
-        stageName: "prod",
-      },
-    });
-
+    
     const formIdService  = new lambda.Function(this, "FormIdService", {
       runtime: lambda.Runtime.NODEJS_18_X,
       code: lambda.Code.fromAsset("bin/lambda"),
@@ -58,5 +38,25 @@ export class AwsInfrastructureStack extends Stack {
       },
     });
 
+    const formConfigService = new lambda.Function(this, "FormConfigService", {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      code: lambda.Code.fromAsset("bin/lambda"),
+      handler: "formConfigService.handler",
+      environment: {
+        "FORM_BUCKET": formConfigBucket.bucketName,
+        "CDN_URL": distribution.domainName,
+        "FORM_ID_ENDPOINT_URL": formIdEndpoint.url,
+      },
+    });
+
+    const formConfigEndpoint = new apigateway.LambdaRestApi(this, "FormConfigEndpoint", {
+      handler: formConfigService,
+      deploy: true,
+      deployOptions: {
+        stageName: "prod",
+      },
+    });
+
+    formConfigBucket.grantReadWrite(formConfigService);
   }
 }

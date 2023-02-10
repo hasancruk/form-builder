@@ -20,15 +20,3 @@ export const handler = awsLambdaRequestHandler({
   createContext,
 })
 
-// export const handler = async (event: APIGatewayEvent) => {
-//   console.log("request:", JSON.stringify(event, undefined, 2));
-//   let response = {
-//     statusCode: 200,
-//     headers: { "Content-Type": "application/json" },
-//   };
-
-//    return {
-//     ...response,
-//     body: "Welcome to the form id service",
-//   };
-// };
