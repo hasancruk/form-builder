@@ -1,4 +1,3 @@
-"use strict";
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -17,12 +16,12 @@ var __copyProps = (to, from, except, desc) => {
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// lambda/rwFormConfig.ts
-var rwFormConfig_exports = {};
-__export(rwFormConfig_exports, {
+// src/formConfigService.ts
+var formConfigService_exports = {};
+__export(formConfigService_exports, {
   handler: () => handler
 });
-module.exports = __toCommonJS(rwFormConfig_exports);
+module.exports = __toCommonJS(formConfigService_exports);
 
 // src/utils.ts
 var import_client_s3 = require("@aws-sdk/client-s3");
@@ -61,7 +60,7 @@ var getForm = async (url, fileName) => {
   }
 };
 
-// lambda/rwFormConfig.ts
+// src/formConfigService.ts
 var handler = async (event) => {
   console.log("request:", JSON.stringify(event, void 0, 2));
   const bucket = process.env.FORM_BUCKET;

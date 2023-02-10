@@ -1,18 +1,12 @@
 {
-  "name": "form-builder",
+  "name": "common-lib",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "esbuild": "0.17.6"
-  }
+  "license": "ISC"
 }

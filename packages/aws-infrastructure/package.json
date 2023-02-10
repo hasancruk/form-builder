@@ -6,13 +6,16 @@
   },
   "scripts": {
     "build": "tsc",
-    "build-lambda": "node ./scripts/build.mjs",
+    "build:formConfigService": "cd ../form-config-service && pnpm build",
+    "build:formIdService": "cd ../form-id-service && pnpm build",
+    "build:lambdas": "pnpm build:formConfigService && pnpm build:formIdService",
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
-    "cdk-deploy": "pnpm build-lambda && cdk deploy"
+    "cdk:deploy": "pnpm build:lambdas && cdk deploy"
   },
   "devDependencies": {
+    "@types/aws-lambda": "^8.10.110",
     "@types/jest": "^29.2.5",
     "@types/node": "18.11.18",
     "@types/react-router-dom": "5.1.8",
@@ -25,6 +28,8 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.266.0",
+    "@trpc/client": "^10.10.0",
+    "@trpc/server": "^10.10.0",
     "aws-cdk-lib": "2.62.2",
     "constructs": "^10.0.0"
   }

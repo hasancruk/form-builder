@@ -1,44 +1,7 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { putFormToS3, getForm } from "./utils";
+import type { APIGatewayEvent } from "aws-lambda";
 
-const putFormToS3 = async (bucket: string, key: string, data: unknown) => {
-  const client = new S3Client();
-  const params = {
-    Bucket: bucket,
-    Key: key,
-    Body: data
-  };
-  
-  const command = new PutObjectCommand(params);
-
-  try {
-    const resp = await client.send(command);
-    console.log(resp);
-    return { success: true };
-  } catch (err: unknown) {
-    console.error(err);
-    return { success: false };
-  }
-};
-
-const getForm = async (url: string, fileName: string) => {
-  try {
-    const resp = await fetch(`https://${url}/${fileName}`);
-    if (!resp.ok) {
-      throw new Error("No such file");
-    }
-    const data = await resp.json();
-    console.log(resp);
-    return { 
-      data,
-      success: true
-    };
-  } catch (err: unknown) {
-    console.error(err);
-    return { success: false };
-  }
-};
-
-export const handler = async (event: any) => {
+export const handler = async (event: APIGatewayEvent) => {
   console.log("request:", JSON.stringify(event, undefined, 2));
 
   const bucket = process.env.FORM_BUCKET;

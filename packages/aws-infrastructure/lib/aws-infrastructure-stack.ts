@@ -24,21 +24,34 @@ export class AwsInfrastructureStack extends Stack {
       defaultBehavior: { origin: new origins.S3Origin(formConfigBucket) },
     });
 
-    const rwFormConfig = new lambda.Function(this, "RWFormConfig", {
+    const formConfigService = new lambda.Function(this, "FormConfigService", {
       runtime: lambda.Runtime.NODEJS_18_X,
-      // TODO Replace this with typescript lambdas
       code: lambda.Code.fromAsset("bin/lambda"),
-      handler: "rwFormConfig.handler",
+      handler: "formConfigService.handler",
       environment: {
         "FORM_BUCKET": formConfigBucket.bucketName,
         "CDN_URL": distribution.domainName,
       },
     });
 
-    formConfigBucket.grantReadWrite(rwFormConfig);
+    formConfigBucket.grantReadWrite(formConfigService);
 
     const formsEndpoint = new apigateway.LambdaRestApi(this, "FormsEndpoint", {
-      handler: rwFormConfig,
+      handler: formConfigService,
+      deploy: true,
+      deployOptions: {
+        stageName: "prod",
+      },
+    });
+
+    const formIdService  = new lambda.Function(this, "FormIdService", {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      code: lambda.Code.fromAsset("bin/lambda"),
+      handler: "formIdService.handler",
+    });
+    
+    const formIdEndpoint = new apigateway.LambdaRestApi(this, "FormIdEndpoint", {
+      handler: formIdService,
       deploy: true,
       deployOptions: {
         stageName: "prod",
