@@ -5,23 +5,35 @@ import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 
 export class AwsInfrastructureStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
     
-    // TODO Encrypt this bucket
-    // TODO Define removal and retention policy
     const formConfigBucket = new s3.Bucket(this, "FormConfigBucket", {
       bucketName: "form-config-bucket",
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
-      // TODO Does this mean when retrieved, all the versions will be retrieved?
       versioned: true,
     });
     
     const distribution = new cloudfront.Distribution(this, "FormConfigDistribution", {
       defaultBehavior: { origin: new origins.S3Origin(formConfigBucket) },
+    });
+
+    // TODO index for faster queries
+    // add ttl value so I don't get charged
+    const formsTable = new dynamodb.Table(this, "Forms", {
+      partitionKey: { name: "formId", type: dynamodb.AttributeType.STRING }, 
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+
+    const formIdCounter = new dynamodb.Table(this, "FormIdCounter", {
+      partitionKey: { name: "count", type: dynamodb.AttributeType.NUMBER}, 
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: RemovalPolicy.DESTROY,
     });
     
     const formIdService  = new lambda.Function(this, "FormIdService", {
@@ -58,5 +70,7 @@ export class AwsInfrastructureStack extends Stack {
     });
 
     formConfigBucket.grantReadWrite(formConfigService);
+    formsTable.grantFullAccess(formIdService);
+    formIdCounter.grantFullAccess(formIdService);
   }
 }

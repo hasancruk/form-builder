@@ -3,8 +3,6 @@ import type { APIGatewayEvent } from "aws-lambda";
 import type { AppRouter } from "../../form-id-service/src/formIdService";
 import { createTRPCProxyClient, httpBatchLink } from "@trpc/client";
 
-
-
 export const handler = async (event: APIGatewayEvent) => {
   console.log("request:", JSON.stringify(event, undefined, 2));
 
