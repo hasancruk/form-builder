@@ -17,8 +17,8 @@ export const dbForm = z.object({
     z.literal("issued"),
     z.literal("archived"),
   ]),
-  dataCreated: z.date(),
-  dateUpdated: z.date(),
+  // dataCreated: z.date(),
+  // dateUpdated: z.date(),
 }).merge(createForm).merge(mutateForm);
 
 export type DBFormType = z.infer<typeof dbForm>;

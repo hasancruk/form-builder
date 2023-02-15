@@ -5119,16 +5119,33 @@ var dbForm = zod_exports.z.object({
     zod_exports.z.literal("orphaned"),
     zod_exports.z.literal("issued"),
     zod_exports.z.literal("archived")
-  ]),
-  dataCreated: zod_exports.z.date(),
-  dateUpdated: zod_exports.z.date()
+  ])
+  // dataCreated: z.date(),
+  // dateUpdated: z.date(),
 }).merge(createForm).merge(mutateForm);
 
 // src/util.ts
 var import_client_dynamodb = require("@aws-sdk/client-dynamodb");
 var createNewFormImpl = async (client, counterClient, formName) => {
   const { newId } = await getNewFormId(client, counterClient, { formName });
-  return newId;
+  const item = {
+    formName,
+    formId: newId,
+    formStatus: "created"
+  };
+  const command = new import_client_dynamodb.PutItemCommand({
+    ...client.params,
+    Item: {
+      formId: { S: item.formId },
+      formStatus: { S: item.formStatus },
+      formName: { S: item.formName }
+    }
+  });
+  const resp = await client.client.send(command);
+  console.log("INFO CreateNewForm:", resp);
+  return {
+    item
+  };
 };
 var getNewFormId = async (client, counterClient, { formName }) => {
   const clientScan = new import_client_dynamodb.ScanCommand({
@@ -5154,8 +5171,57 @@ var getNewFormId = async (client, counterClient, { formName }) => {
     message: "INFO generated a new formId"
   };
 };
-var archiveFormByIdImpl = (client, counterClient, formId) => "";
-var rejectFormByIdImpl = (client, counterClient, formId) => "";
+var archiveFormByIdImpl = async (client, counterClient, formId) => {
+  const command = new import_client_dynamodb.UpdateItemCommand({
+    ...client.params,
+    Key: {
+      formId: { S: formId }
+    },
+    UpdateExpression: "SET formStatus = :status",
+    ExpressionAttributeValues: { ":status": { S: "archived" } },
+    ReturnValues: "UPDATED_NEW"
+  });
+  const resp = await client.client.send(command);
+  console.log("INFO ArchiveByFormId:", resp);
+  return {
+    status: resp.$metadata.httpStatusCode,
+    message: resp.$metadata.httpStatusCode === 200 ? `INFO ${resp.Attributes?.formName.S ?? formId} archived successfully` : `INFO Could not archive formId:${formId}`
+  };
+};
+var rejectFormByIdImpl = async (client, counterClient, formId) => {
+  const command = new import_client_dynamodb.UpdateItemCommand({
+    ...client.params,
+    Key: {
+      formId: { S: formId }
+    },
+    UpdateExpression: "SET formStatus = :status",
+    ExpressionAttributeValues: { ":status": { S: "orphaned" } },
+    ReturnValues: "UPDATED_NEW"
+  });
+  const resp = await client.client.send(command);
+  console.log("INFO RejectByFormId:", resp);
+  return {
+    status: resp.$metadata.httpStatusCode,
+    message: resp.$metadata.httpStatusCode === 200 ? `INFO ${resp.Attributes?.formName.S ?? formId} rejected successfully` : `INFO Could not reject formId:${formId}`
+  };
+};
+var approveFormByIdImpl = async (client, counterClient, formId) => {
+  const command = new import_client_dynamodb.UpdateItemCommand({
+    ...client.params,
+    Key: {
+      formId: { S: formId }
+    },
+    UpdateExpression: "SET formStatus = :status",
+    ExpressionAttributeValues: { ":status": { S: "issued" } },
+    ReturnValues: "UPDATED_NEW"
+  });
+  const resp = await client.client.send(command);
+  console.log("INFO ApproveByFormId:", resp);
+  return {
+    status: resp.$metadata.httpStatusCode,
+    message: resp.$metadata.httpStatusCode === 200 ? `INFO ${resp.Attributes?.formName.S ?? formId} approved successfully` : `INFO Could not approve formId:${formId}`
+  };
+};
 var incrementCounter = async ({ client, params }) => {
   const command = new import_client_dynamodb.UpdateItemCommand({
     ...params,
@@ -5167,11 +5233,15 @@ var incrementCounter = async ({ client, params }) => {
     ReturnValues: "UPDATED_NEW"
   });
   const resp = await client.send(command);
-  console.log(resp);
+  console.log("INFO Counter DB:", resp);
   return {
     status: resp.$metadata.httpStatusCode,
-    newId: "ONDON0000042"
+    newId: formatFormId("ONDON", resp.Attributes?.formCount.N)
   };
+};
+var formatFormId = (prefix, n) => {
+  const id = ("000000" + (n ?? "0")).slice(-6);
+  return `${prefix}${id}`;
 };
 var initOperations = ({ dbTableName, counterDbTableName }) => {
   const client = {
@@ -5188,8 +5258,16 @@ var initOperations = ({ dbTableName, counterDbTableName }) => {
   };
   return {
     createNewForm: (formName) => createNewFormImpl(client, counterClient, formName),
-    archiveFormById: (formId) => archiveFormByIdImpl(client, counterClient, formId),
-    rejectFormById: (formId) => rejectFormByIdImpl(client, counterClient, formId)
+    processFormById: (formId, action) => {
+      switch (action) {
+        case "approve":
+          return approveFormByIdImpl(client, counterClient, formId);
+        case "archive":
+          return archiveFormByIdImpl(client, counterClient, formId);
+        case "reject":
+          return rejectFormByIdImpl(client, counterClient, formId);
+      }
+    }
   };
 };
 
@@ -5197,7 +5275,7 @@ var initOperations = ({ dbTableName, counterDbTableName }) => {
 var t = server_exports.initTRPC.create();
 var db = process.env.DB;
 var counterDb = process.env.COUNTER_DB;
-var { createNewForm, rejectFormById, archiveFormById } = initOperations({ dbTableName: db, counterDbTableName: counterDb });
+var { createNewForm, processFormById } = initOperations({ dbTableName: db, counterDbTableName: counterDb });
 var appRouter = t.router({
   getFormId: t.procedure.input(zod_exports.z.string()).query((req) => ({ id: req.input, greeting: "Hello from tRPC" })),
   newForm: t.procedure.input(createForm).mutation(async ({ input }) => {
@@ -5207,18 +5285,9 @@ var appRouter = t.router({
       id: createResult
     };
   }),
-  rejectFormById: t.procedure.input(mutateForm).mutation(({ input }) => {
-    const rejectionResult = rejectFormById(input.formId);
-    return {
-      message: "rejectFormById not yet implemented"
-    };
-  }),
-  archiveFormById: t.procedure.input(mutateForm).mutation(({ input }) => {
-    const archiveResult = archiveFormById(input.formId);
-    return {
-      message: "archiveFormById not yet implemented"
-    };
-  })
+  rejectFormById: t.procedure.input(mutateForm).mutation(async ({ input }) => await processFormById(input.formId, "reject")),
+  archiveFormById: t.procedure.input(mutateForm).mutation(async ({ input }) => await processFormById(input.formId, "archive")),
+  approveFormById: t.procedure.input(mutateForm).mutation(async ({ input }) => await processFormById(input.formId, "approve"))
 });
 var createContext = ({ event, context }) => ({});
 var handler = (0, aws_lambda_exports.awsLambdaRequestHandler)({

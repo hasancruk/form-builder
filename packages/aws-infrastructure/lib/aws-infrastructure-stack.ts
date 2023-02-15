@@ -37,6 +37,7 @@ export class AwsInfrastructureStack extends Stack {
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
+    // TODO Verify if this is overwriting the db entry on re-deploy
     const counterDbInit = new cr.AwsCustomResource(this, "InitCounterDB", {
       onCreate: {
         service: "DynamoDB",

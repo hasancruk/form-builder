@@ -59,9 +59,28 @@ export const handler = async (event: APIGatewayEvent) => {
     }
   } else if (event.httpMethod === "POST") {
       if (event.path === "/trpc") {
-        const data = await client.newForm.mutate({ formName: "support-us" });
+        const { process, formId } = event.queryStringParameters;
+
+        let data: unknown;
+        
+        // TODO Validate the inputs
+        switch (process) {
+          case "approve":
+            data = await client.approveFormById.mutate({ formId });
+            break;
+          case "archive":
+            data = await client.archiveFormById.mutate({ formId });
+            break;
+          case "reject":
+            data = await client.rejectFormById.mutate({ formId });
+            break;
+          default:
+            data = await client.newForm.mutate({ formName: "support-us" });
+            break;
+
+        };
         body = {
-          message: `You created form: ${data.id} and it says ${data.message}`,
+          message: `Data ID: ${data.id}, Data message: ${data.message}`,
         }; 
       } else {
         body = {

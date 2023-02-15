@@ -10,7 +10,7 @@ export const t = initTRPC.create();
 const db = process.env.DB as string;
 const counterDb = process.env.COUNTER_DB as string;
 
-const { createNewForm, rejectFormById, archiveFormById } = initOperations({ dbTableName: db, counterDbTableName: counterDb });
+const { createNewForm, processFormById } = initOperations({ dbTableName: db, counterDbTableName: counterDb });
 
 const appRouter = t.router({
   getFormId: t.procedure.input(z.string()).query((req) => ({ id: req.input, greeting: "Hello from tRPC" })),
@@ -26,22 +26,13 @@ const appRouter = t.router({
             }),
   rejectFormById: t.procedure
                 .input(mutateForm)
-                .mutation(({ input }) => {
-                  const rejectionResult = rejectFormById(input.formId);
-
-                  return {
-                    message: "rejectFormById not yet implemented",
-                  };
-                }),
+                .mutation(async ({ input }) => await processFormById(input.formId, "reject")),
   archiveFormById: t.procedure
                 .input(mutateForm)
-                .mutation(({ input }) => {
-                  const archiveResult = archiveFormById(input.formId);
-
-                  return {
-                    message: "archiveFormById not yet implemented",
-                  };
-                }),
+                .mutation(async ({ input }) => await processFormById(input.formId, "archive")), 
+  approveFormById: t.procedure
+                .input(mutateForm)
+                .mutation(async ({ input }) => await processFormById(input.formId, "approve")),
 });
 
 export type AppRouter = typeof appRouter;
