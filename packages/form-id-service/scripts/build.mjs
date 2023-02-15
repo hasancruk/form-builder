@@ -9,6 +9,7 @@ await esbuild.build({
   target: "node18",
   format: "cjs",
   outfile: "../aws-infrastructure/bin/lambda/formIdService.js",
+  external: ["@aws-sdk/client-dynamodb"],
   plugins: [
     resolve({
       zod: pathResolve("./node_modules/zod"),

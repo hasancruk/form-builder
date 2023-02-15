@@ -1482,9 +1482,16 @@ var handler = async (event) => {
       };
     }
   } else if (event.httpMethod === "POST") {
-    body = {
-      message: "POST is not yet supported"
-    };
+    if (event.path === "/trpc") {
+      const data = await client.newForm.mutate({ formName: "support-us" });
+      body = {
+        message: `You created form: ${data.id} and it says ${data.message}`
+      };
+    } else {
+      body = {
+        message: "POST is not yet supported"
+      };
+    }
   } else if (event.httpMethod === "PUT") {
     const { success } = await putFormToS3(bucket, key, JSON.stringify(form));
     body = {

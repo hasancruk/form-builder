@@ -5106,10 +5106,119 @@ __export(zod_exports, {
 __reExport(zod_exports, __toESM(require_lib()));
 var import_zod = __toESM(require_lib());
 
+// ../common-lib/src/lib/schema/dbForm.ts
+var createForm = zod_exports.z.object({
+  formName: zod_exports.z.string()
+});
+var mutateForm = zod_exports.z.object({
+  formId: zod_exports.z.string()
+});
+var dbForm = zod_exports.z.object({
+  formStatus: zod_exports.z.union([
+    zod_exports.z.literal("created"),
+    zod_exports.z.literal("orphaned"),
+    zod_exports.z.literal("issued"),
+    zod_exports.z.literal("archived")
+  ]),
+  dataCreated: zod_exports.z.date(),
+  dateUpdated: zod_exports.z.date()
+}).merge(createForm).merge(mutateForm);
+
+// src/util.ts
+var import_client_dynamodb = require("@aws-sdk/client-dynamodb");
+var createNewFormImpl = async (client, counterClient, formName) => {
+  const { newId } = await getNewFormId(client, counterClient, { formName });
+  return newId;
+};
+var getNewFormId = async (client, counterClient, { formName }) => {
+  const clientScan = new import_client_dynamodb.ScanCommand({
+    ...client.params,
+    FilterExpression: "formStatus = :status",
+    ExpressionAttributeValues: {
+      ":status": { S: "orphaned" }
+    }
+  });
+  const scanResp = await client.client.send(clientScan);
+  console.log(scanResp.Items?.length > 0 ? scanResp.Items : "no items found for this query");
+  const selectedFormId = scanResp.Items?.at(0)?.formId.S;
+  if (selectedFormId) {
+    return {
+      newId: selectedFormId,
+      message: "INFO reusing an orphaned formId"
+    };
+  }
+  const { status, newId } = await incrementCounter(counterClient);
+  console.log(status);
+  return {
+    newId,
+    message: "INFO generated a new formId"
+  };
+};
+var archiveFormByIdImpl = (client, counterClient, formId) => "";
+var rejectFormByIdImpl = (client, counterClient, formId) => "";
+var incrementCounter = async ({ client, params }) => {
+  const command = new import_client_dynamodb.UpdateItemCommand({
+    ...params,
+    Key: {
+      counterKey: { S: "current" }
+    },
+    UpdateExpression: "SET formCount = formCount + :incr",
+    ExpressionAttributeValues: { ":incr": { N: "1" } },
+    ReturnValues: "UPDATED_NEW"
+  });
+  const resp = await client.send(command);
+  console.log(resp);
+  return {
+    status: resp.$metadata.httpStatusCode,
+    newId: "ONDON0000042"
+  };
+};
+var initOperations = ({ dbTableName, counterDbTableName }) => {
+  const client = {
+    client: new import_client_dynamodb.DynamoDBClient({}),
+    params: {
+      TableName: dbTableName
+    }
+  };
+  const counterClient = {
+    client: new import_client_dynamodb.DynamoDBClient({}),
+    params: {
+      TableName: counterDbTableName
+    }
+  };
+  return {
+    createNewForm: (formName) => createNewFormImpl(client, counterClient, formName),
+    archiveFormById: (formId) => archiveFormByIdImpl(client, counterClient, formId),
+    rejectFormById: (formId) => rejectFormByIdImpl(client, counterClient, formId)
+  };
+};
+
 // src/formIdService.ts
 var t = server_exports.initTRPC.create();
+var db = process.env.DB;
+var counterDb = process.env.COUNTER_DB;
+var { createNewForm, rejectFormById, archiveFormById } = initOperations({ dbTableName: db, counterDbTableName: counterDb });
 var appRouter = t.router({
-  getFormId: t.procedure.input(zod_exports.z.string()).query((req) => ({ id: req.input, greeting: "Hello from tRPC" }))
+  getFormId: t.procedure.input(zod_exports.z.string()).query((req) => ({ id: req.input, greeting: "Hello from tRPC" })),
+  newForm: t.procedure.input(createForm).mutation(async ({ input }) => {
+    const createResult = await createNewForm(input.formName);
+    return {
+      message: "newForm not yet implemented",
+      id: createResult
+    };
+  }),
+  rejectFormById: t.procedure.input(mutateForm).mutation(({ input }) => {
+    const rejectionResult = rejectFormById(input.formId);
+    return {
+      message: "rejectFormById not yet implemented"
+    };
+  }),
+  archiveFormById: t.procedure.input(mutateForm).mutation(({ input }) => {
+    const archiveResult = archiveFormById(input.formId);
+    return {
+      message: "archiveFormById not yet implemented"
+    };
+  })
 });
 var createContext = ({ event, context }) => ({});
 var handler = (0, aws_lambda_exports.awsLambdaRequestHandler)({

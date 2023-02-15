@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.267.0",
     "@trpc/server": "^10.10.0",
     "zod": "^3.20.3"
   },

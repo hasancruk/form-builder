@@ -1,11 +1,12 @@
-import { Stack, StackProps, RemovalPolicy } from 'aws-cdk-lib';
-import { Construct } from 'constructs';
-import * as s3 from 'aws-cdk-lib/aws-s3';
-import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import { Stack, StackProps, RemovalPolicy } from "aws-cdk-lib";
+import { Construct } from "constructs";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
-import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as apigateway from 'aws-cdk-lib/aws-apigateway';
-import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as cr from "aws-cdk-lib/custom-resources";
 
 export class AwsInfrastructureStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -31,15 +32,35 @@ export class AwsInfrastructureStack extends Stack {
     });
 
     const formIdCounter = new dynamodb.Table(this, "FormIdCounter", {
-      partitionKey: { name: "count", type: dynamodb.AttributeType.NUMBER}, 
+      partitionKey: { name: "counterKey", type: dynamodb.AttributeType.STRING}, 
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: RemovalPolicy.DESTROY,
+    });
+
+    const counterDbInit = new cr.AwsCustomResource(this, "InitCounterDB", {
+      onCreate: {
+        service: "DynamoDB",
+        action: "putItem",
+        parameters: {
+          TableName: formIdCounter.tableName,
+          Item: {
+            formCount: { N: "0" },
+            counterKey: { S: "current" },
+          },
+        },
+        physicalResourceId: cr.PhysicalResourceId.of(formIdCounter.tableName + '_initialization'),
+      },
+      policy: cr.AwsCustomResourcePolicy.fromSdkCalls({ resources: cr.AwsCustomResourcePolicy.ANY_RESOURCE }),
     });
     
     const formIdService  = new lambda.Function(this, "FormIdService", {
       runtime: lambda.Runtime.NODEJS_18_X,
       code: lambda.Code.fromAsset("bin/lambda"),
       handler: "formIdService.handler",
+      environment: {
+        "DB": formsTable.tableName,
+        "COUNTER_DB": formIdCounter.tableName,
+      },
     });
     
     const formIdEndpoint = new apigateway.LambdaRestApi(this, "FormIdEndpoint", {
