@@ -13,6 +13,7 @@ type DbProps = {
   };
 };
 
+// TODO Update implementation so that the formName is also definitely unique
 const createNewFormImpl = async (client: DbProps, counterClient: DbProps, formName: string) => {
   const { newId } = await getNewFormId(client, counterClient, { formName });  
 
@@ -132,6 +133,7 @@ const approveFormByIdImpl = async (client: DbProps, counterClient: DbProps, form
   const resp = await client.client.send(command);
 
   console.log("INFO ApproveByFormId:", resp);
+  // TODO The attributes returned is only the updated value and not the whole object
 
   return {
     status: resp.$metadata.httpStatusCode,

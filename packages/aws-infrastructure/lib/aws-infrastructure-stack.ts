@@ -18,6 +18,21 @@ export class AwsInfrastructureStack extends Stack {
       autoDeleteObjects: true,
       versioned: true,
     });
+
+    // TODO Set permissions and access
+    const formApprovalBucket = new s3.Bucket(this, "FormApprovalBucket", {
+      bucketName: "form-approval-bucket",
+      removalPolicy: RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      versioned: true,
+    });
+
+    const formArchiveBucket = new s3.Bucket(this, "FormArchiveBucket", {
+      bucketName: "form-archive-bucket",
+      removalPolicy: RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      versioned: true,
+    });
     
     const distribution = new cloudfront.Distribution(this, "FormConfigDistribution", {
       defaultBehavior: { origin: new origins.S3Origin(formConfigBucket) },
@@ -37,7 +52,6 @@ export class AwsInfrastructureStack extends Stack {
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
-    // TODO Verify if this is overwriting the db entry on re-deploy
     const counterDbInit = new cr.AwsCustomResource(this, "InitCounterDB", {
       onCreate: {
         service: "DynamoDB",
@@ -78,6 +92,8 @@ export class AwsInfrastructureStack extends Stack {
       handler: "formConfigService.handler",
       environment: {
         "FORM_BUCKET": formConfigBucket.bucketName,
+        "ARCHIVE_BUCKET": formArchiveBucket.bucketName,
+        "APPROVAL_BUCKET": formApprovalBucket.bucketName,
         "CDN_URL": distribution.domainName,
         "FORM_ID_ENDPOINT_URL": formIdEndpoint.url,
       },
@@ -92,6 +108,9 @@ export class AwsInfrastructureStack extends Stack {
     });
 
     formConfigBucket.grantReadWrite(formConfigService);
+    formArchiveBucket.grantReadWrite(formConfigService);
+    formApprovalBucket.grantReadWrite(formConfigService);
+
     formsTable.grantFullAccess(formIdService);
     formIdCounter.grantFullAccess(formIdService);
   }
