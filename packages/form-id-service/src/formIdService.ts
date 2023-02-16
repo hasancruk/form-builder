@@ -12,6 +12,16 @@ const counterDb = process.env.COUNTER_DB as string;
 
 const { createNewForm, processFormById } = initOperations({ dbTableName: db, counterDbTableName: counterDb });
 
+const mutationResponseSchema = z.object({
+  message: z.string(),
+  formId: z.string(),
+  formName: z.string(),
+  status: z.union([
+    z.literal("success"),
+    z.literal("failed"),
+  ]),
+});
+
 const appRouter = t.router({
   getFormId: t.procedure.input(z.string()).query((req) => ({ id: req.input, greeting: "Hello from tRPC" })),
   newForm: t.procedure
@@ -45,5 +55,5 @@ type Context = inferAsyncReturnType<typeof createContext>;
 export const handler = awsLambdaRequestHandler({
   router: appRouter,
   createContext,
-})
+});
 
