@@ -12,7 +12,8 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
-    "cdk:deploy": "pnpm build:lambdas && cdk deploy"
+    "cdk:deploy": "pnpm build:lambdas && cdk deploy",
+    "cdk:hotswap": "pnpm build:lambdas && cdk deploy --hotswap"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.110",

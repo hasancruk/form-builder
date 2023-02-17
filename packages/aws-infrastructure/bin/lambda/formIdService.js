@@ -5276,6 +5276,15 @@ var t = server_exports.initTRPC.create();
 var db = process.env.DB;
 var counterDb = process.env.COUNTER_DB;
 var { createNewForm, processFormById } = initOperations({ dbTableName: db, counterDbTableName: counterDb });
+var mutationResponseSchema = zod_exports.z.object({
+  message: zod_exports.z.string(),
+  formId: zod_exports.z.string(),
+  formName: zod_exports.z.string(),
+  status: zod_exports.z.union([
+    zod_exports.z.literal("success"),
+    zod_exports.z.literal("failed")
+  ])
+});
 var appRouter = t.router({
   getFormId: t.procedure.input(zod_exports.z.string()).query((req) => ({ id: req.input, greeting: "Hello from tRPC" })),
   newForm: t.procedure.input(createForm).mutation(async ({ input }) => {

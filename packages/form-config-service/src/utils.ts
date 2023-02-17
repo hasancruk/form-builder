@@ -1,15 +1,18 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+
+const initS3 = (bucket: string, key: string) => ({
+  client: new S3Client({}),
+  params: {
+    Bucket: bucket,
+    Key: key,
+  },
+});
 
 export const putForm = async (bucket: string, formName: string, data: string) => {
   // TODO Pass in region from env variable
-  const client = new S3Client({});
-  const params = {
-    Bucket: bucket,
-    Key: formName,
-    Body: data
-  };
+  const { client, params } = initS3(bucket, formName);
   
-  const command = new PutObjectCommand(params);
+  const command = new PutObjectCommand({ ...params, Body: data });
 
   try {
     const resp = await client.send(command);
@@ -22,10 +25,17 @@ export const putForm = async (bucket: string, formName: string, data: string) =>
 };
 
 const removeForm = async (bucket: string, formName: string) => {
-  
-  return {
-    success: false,
-  };
+  const { client, params } = initS3(bucket, formName);  
+  const command = new DeleteObjectCommand(params);
+
+  try {
+    const resp = await client.send(command);
+    console.log(resp);
+    return { success: true };
+  } catch (err: unknown) {
+    console.error(err);
+    return { success: false };
+  }
 }
 
 // TODO Read item from source -> putInto archive -> delete from source
@@ -41,9 +51,21 @@ export const archiveForm = async (sourceBucket: string, targetBucket: string, fo
   };
 };
 
+
+// TODO newData should be a strict subset of the full form
+const updateFormData = (current: any, newData: any) => {
+  // TODO Implement function based on what the get function returns
+  return {};
+};
+
 // TODO get from approval -> add/update additional fields -> putinto main bucket -> delete from temp bucket
-export const approveForm = async (approvalBucket: string, formBucket: string, data: any, formName: string) => {
-  
+// TODO Send correct responses and add error handling
+export const approveForm = async (approvalBucket: string, formBucket: string, formName: string, data: any) => {
+  const getResp = await getForm(approvalBucket, formName);
+  const updatedData = updateFormData({}, data);
+  const putResp = await putForm(formBucket, formName, JSON.stringify(updateFormData));
+  const deleteResp = await removeForm(approvalBucket, formName);
+
   return {
     success: false,
   };
@@ -58,14 +80,26 @@ export const rejectForm = async (approvalBucket: string, formName: string) => {
   };
 };
 
-
+// TODO return the data back
 const getForm = async (bucket: string, formName: string) => {
-  
-  return {
-    data: {},
-    success: true,
-  };
+  const { client, params } = initS3(bucket, formName);  
+  const command = new GetObjectCommand({
+    ...params, 
+    ResponseContentType: "application/json; charset=utf-8",
+  });
+
+  try {
+    const resp = await client.send(command);
+    const data = await resp.Body?.transformToString();
+    console.log(resp);
+    return { success: true, data: data ? JSON.parse(data) : {} };
+  } catch (err: unknown) {
+    console.error(err);
+    return { success: false };
+  }
 };
+
+export const fetchFormFromBucket = async (bucket: string, formName: string) => await getForm(bucket, formName);
 
 export const fetchForm = async (cdnUrl: string, formName: string) => {
   try {

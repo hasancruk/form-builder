@@ -4,7 +4,7 @@ import type { APIGatewayProxyEventV2 } from "aws-lambda";
 import { createTRPCProxyClient, httpBatchLink } from "@trpc/client";
 import { z } from "zod";
 
-import { putForm, fetchForm, archiveForm, approveForm, rejectForm } from "./utils";
+import { putForm, fetchForm, archiveForm, approveForm, rejectForm, fetchFormFromBucket } from "./utils";
 import type { AppRouter as FormIdRouter } from "../../form-id-service/src/formIdService";
 
 export const t = initTRPC.create();
@@ -26,6 +26,7 @@ const client = createTRPCProxyClient<FormIdRouter>({
   ],
 });
 
+// TODO extract schema to be a form partial
 const newFormRequestSchema = z.object({
   formName: z.string(),
 });
@@ -52,7 +53,7 @@ const approveById = async (formId: string) => {
   const res = await approveForm(approvalBucket, formBucket, formId, {});
 
   return {
-    message: "",
+    message: "approval successful",
   };
 
 };
@@ -82,6 +83,16 @@ const archiveById = async (formId: string) => {
   };
 };
 
+const createForm = async (form: z.infer<typeof newFormRequestSchema>) => {
+  const { message, id } = await client.newForm.mutate(form);
+  // TODO If creation was successful, then write to approvalBucket
+
+  const res = await putForm(approvalBucket, form.formName, JSON.stringify(form));
+  
+  return {
+    message: "",
+  };
+};
 
 // TODO Define unified output response to better define the contracts
 
@@ -89,14 +100,11 @@ const appRouter = t.router({
   createNewForm: t.procedure
                   .input(newFormRequestSchema)
                   .mutation(async ({ input }) => {
-                    const { message, id } = await client.newForm.mutate(input);
-
+                    const resp = await createForm(input);
                     // TODO If creation was successful, then write to approvalBucket
 
                     return {
-                      message,
-                      formId: id.item.formId,
-                      formName: id.item.formName,
+                      message: "",
                     };
                   }),
   processFormById: t.procedure
@@ -121,33 +129,56 @@ const appRouter = t.router({
                         message: resp.message,
                       };
                     }),
-  getFormById: t.procedure
-                .input(getFormSchema)
-                .query(async ({ input }) => {
-                  if (!input.formId) {
-                    return {
-                      message: "No formId provided",
-                      data: {},
-                    };
-                  }
-                  
-                  const { data } = await fetchForm(cdnUrl, input.formId);
+  // getFormById: t.procedure
+  //               .input(getFormSchema)
+  //               .query(async ({ input }) => {
+  //                 if (!input.formId) {
+  //                   return {
+  //                     message: "No formId provided",
+  //                     data: {},
+  //                   };
+  //                 }
+  //                 
+  //                 const { success } = await fetchFormById(formBucket, input.formId);
+
+  //                 return {
+  //                   message: success ? "get from bucket successful" : "failed to get from bucket",
+  //                 };
+  //               }),
+  // DEBUG To debug from postman
+  getFormFromBucket: t.procedure
+                .query(async () => {
+                  const { success, data } = await fetchFormFromBucket(formBucket, "support-us.json");
 
                   return {
-                    data,
+                    message: success ? "get from bucket successful" : "failed to get from bucket",
+                    data: data ?? { content: "nothing here" },
                   };
                 }),
+
   getFormByName: t.procedure
                   .input(getFormSchema)
-                  .query(({ input }) => {
+                  .query(async ({ input }) => {
+                     if (!input.formName) {
+                      return {
+                        message: "No formName provided",
+                        data: {},
+                      };
+                    }
                     
+                    const { data } = await fetchForm(cdnUrl, input.formName);
+
                     return {
-                      data: {},
+                      message: "Success",
+                      data,
                     };
                   }),
-  // modifyFormById: t.procedure
-  //                  .input()
-  //                  .mutation(),
+  modifyFormById: t.procedure
+                   .mutation(() => {
+                    return {
+                      message: "Not yet supported",
+                    };
+                   }),
 });
 
 export type AppRouter = typeof appRouter;
@@ -162,103 +193,3 @@ export const handler = awsLambdaRequestHandler({
   createContext,
 });
 
-// export const handler = async (event: APIGatewayEvent) => {
-//   console.log("request:", JSON.stringify(event, undefined, 2));
-
-//   // const bucket = process.env.FORM_BUCKET;
-//   // const key = "support-us.json";
-//   // const cdnUrl = process.env.CDN_URL;
-//   // const formIdServiceUrl = process.env.FORM_ID_ENDPOINT_URL;
-
-//   // const client = createTRPCProxyClient<FormIdRouter>({
-//   //   links: [
-//   //     httpBatchLink({
-//   //       url: formIdServiceUrl ?? "http://localhost:3000/trpc",
-//   //     }),
-//   //   ],
-//   // });
-
-
-//   let response = {
-//     statusCode: 200,
-//     headers: { "Content-Type": "application/json" },
-//   };
-
-//   const form = {
-//     id: 123,
-//     name: "my-form",
-//     values: {
-//       nudges: [1, 2, 3, 4],
-//       regularNudges: [1, 2, 3, 4]
-//     },
-//     email: true
-//   };
-//   
-//   let body = {
-//     message: "nothing"
-//   };
-
-//   if (event.httpMethod === "GET") {
-//     if (event.path === "/forms") {
-//       const { formId } = event.queryStringParameters;
-//       const { data, success } = await getForm(cdnUrl, formId);
-//       body = {
-//         message: success ? JSON.stringify(data) : "nothing found",
-//       };  
-//     } else if (event.path === "/trpc") {
-//       const { formId } = event.queryStringParameters;
-//       const data = await client.getFormId.query(formId);
-//       body = {
-//         message: `You queried for form: ${data.id} and it says ${data.greeting}`,
-//       }; 
-//     } else {
-//       body = {
-//         message: "this path is not supported yet"
-//       };
-//     }
-//   } else if (event.httpMethod === "POST") {
-//       if (event.path === "/trpc") {
-//         const { process, formId } = event.queryStringParameters;
-
-//         let data: unknown;
-//         
-//         // TODO Validate the inputs
-//         switch (process) {
-//           case "approve":
-//             data = await client.approveFormById.mutate({ formId });
-//             break;
-//           case "archive":
-//             data = await client.archiveFormById.mutate({ formId });
-//             break;
-//           case "reject":
-//             data = await client.rejectFormById.mutate({ formId });
-//             break;
-//           default:
-//             data = await client.newForm.mutate({ formName: "support-us" });
-//             break;
-
-//         };
-//         body = {
-//           message: `Data ID: ${data.id}, Data message: ${data.message}`,
-//         }; 
-//       } else {
-//         body = {
-//           message: "POST is not yet supported"
-//         };
-//       }
-//   } else if (event.httpMethod === "PUT") {
-//     const { success } = await putFormToS3(bucket, key, JSON.stringify(form));
-//     body = {
-//       message: success ? "PUT form config sucessfully" : "Could not PUT form config in bucket"
-//     };
-//   } else {
-//     body = {
-//       message: "Unknown method and path, url: " + formIdServiceUrl,
-//     };
-//   }
-
-//   return {
-//     ...response,
-//     body: JSON.stringify(body),
-//   };
-// };
